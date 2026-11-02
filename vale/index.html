@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Prueba del selector</title>
+<style>
+  body { font: 16px/1.4 -apple-system, system-ui, sans-serif; margin: 16px; max-width: 700px; }
+  .aviso { background: #fff3cd; padding: 10px; border-radius: 8px; }
+  label { display: block; margin: 14px 0; font-weight: 600; }
+  input[type=file] { display: block; margin-top: 6px; font-weight: 400; width: 100%; }
+  .foto { border-top: 1px solid #ccc; padding: 10px 0; }
+  .foto img { max-width: 100%; display: block; margin-top: 6px; }
+  dt { font-weight: 600; float: left; clear: left; margin-right: 6px; }
+  dd { margin: 0 0 2px; }
+  textarea { width: 100%; height: 180px; font: 12px monospace; }
+</style>
+</head>
+<body>
+<h1>Prueba del selector</h1>
+<p class="aviso">Usá fotos personales, nunca clínicas. Esta página procesa todo en el teléfono y no envía nada.</p>
+<p id="modo"></p>
+
+<label>A. Selector con <code>image/*</code>
+  <input type="file" id="a" accept="image/*" multiple></label>
+<label>B. Selector con HEIC y JPEG
+  <input type="file" id="b" accept="image/heic,image/heif,image/jpeg" multiple></label>
+<label>C. Selector sin filtro
+  <input type="file" id="c" multiple></label>
+<label>D. Cámara con <code>capture</code>
+  <input type="file" id="d" accept="image/*" capture="environment"></label>
+
+<div id="resultados"></div>
+<h2>Reporte para copiar</h2>
+<textarea id="reporte" readonly></textarea>
+
+<script>
+// <parser>
+function findTiff(bytes) {
+  // "Exif\0\0" seguido de un encabezado TIFF. Sirve para JPEG y HEIC.
+  for (let i = 0; i + 10 < bytes.length; i++) {
+    if (bytes[i] !== 0x45 || bytes[i + 1] !== 0x78 || bytes[i + 2] !== 0x69 || bytes[i + 3] !== 0x66 ||
+        bytes[i + 4] !== 0 || bytes[i + 5] !== 0) continue;
+    const a = bytes[i + 6], b = bytes[i + 7], c = bytes[i + 8], d = bytes[i + 9];
+    if ((a === 0x49 && b === 0x49 && c === 0x2a && d === 0) ||
+        (a === 0x4d && b === 0x4d && c === 0 && d === 0x2a)) return i + 6;
+  }
+  return -1;
+}
+
+function readExif(bytes) {
+  const out = { exif: false, dateTimeOriginal: null, offsetTimeOriginal: null, dateTime: null, gps: false };
+  const start = findTiff(bytes);
+  if (start < 0) return out;
+  out.exif = true;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const le = bytes[start] === 0x49;
+  const u16 = (o) => view.getUint16(start + o, le);
+  const u32 = (o) => view.getUint32(start + o, le);
+  const ascii = (entry) => {
+    const count = u32(entry + 4);
+    const offset = count <= 4 ? entry + 8 : u32(entry + 8);
+    let text = '';
+    for (let i = 0; i < count - 1; i++) text += String.fromCharCode(bytes[start + offset + i]);
+    return text;
+  };
+  const entries = (ifd) => {
+    const list = [];
+    const count = u16(ifd);
+    for (let i = 0; i < count; i++) {
+      const entry = ifd + 2 + i * 12;
+      list.push({ tag: u16(entry), entry });
+    }
+    return list;
+  };
+  try {
+    let exifIfd = 0, gpsIfd = 0;
+    for (const { tag, entry } of entries(u32(4))) {
+      if (tag === 0x0132) out.dateTime = ascii(entry);
+      if (tag === 0x8769) exifIfd = u32(entry + 8);
+      if (tag === 0x8825) gpsIfd = u32(entry + 8);
+    }
+    if (exifIfd) for (const { tag, entry } of entries(exifIfd)) {
+      if (tag === 0x9003) out.dateTimeOriginal = ascii(entry);
+      if (tag === 0x9011) out.offsetTimeOriginal = ascii(entry);
+    }
+    if (gpsIfd) out.gps = entries(gpsIfd).some(({ tag }) => tag === 0x0002);
+  } catch (e) {
+    out.error = String(e);
+  }
+  return out;
+}
+// </parser>
+
+const LADO_MAXIMO = 1600;
+const CALIDAD = 0.7;
+const kb = (n) => Math.round(n / 1024) + ' KB';
+const lineas = [];
+
+function reducir(file) {
+  return createImageBitmap(file).then((bitmap) => {
+    const escala = Math.min(1, LADO_MAXIMO / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return new Promise((resolve, reject) => canvas.toBlob(
+      (blob) => blob ? resolve({ blob, width: bitmap.width, height: bitmap.height }) : reject(new Error('toBlob vacío')),
+      'image/jpeg', CALIDAD));
+  });
+}
+
+async function procesar(file, variante, n) {
+  const exif = readExif(new Uint8Array(await file.arrayBuffer()));
+  const datos = {
+    'Variante': variante,
+    'Archivo': n + ' de la tanda',
+    'Tipo': file.type || '(vacío)',
+    'Peso': kb(file.size),
+    'lastModified': new Date(file.lastModified).toISOString(),
+    'EXIF': exif.exif ? 'sí' : 'no',
+    'DateTimeOriginal': exif.dateTimeOriginal || '(no)',
+    'OffsetTimeOriginal': exif.offsetTimeOriginal || '(no)',
+    'Ubicación en el archivo': exif.gps ? 'sí' : 'no',
+  };
+  if (exif.error) datos['Error EXIF'] = exif.error;
+  let url = null;
+  try {
+    const inicio = performance.now();
+    const r = await reducir(file);
+    datos['Tamaño original'] = r.width + 'x' + r.height;
+    datos['Peso reducido'] = kb(r.blob.size);
+    datos['Tiempo de reducción'] = Math.round(performance.now() - inicio) + ' ms';
+    const salida = readExif(new Uint8Array(await r.blob.arrayBuffer()));
+    datos['Ubicación tras reducir'] = salida.gps ? 'sí' : 'no';
+    url = URL.createObjectURL(r.blob);
+  } catch (e) {
+    datos['Error al reducir'] = String(e);
+  }
+  const caja = document.createElement('div');
+  caja.className = 'foto';
+  const dl = document.createElement('dl');
+  for (const [k, v] of Object.entries(datos)) {
+    const dt = document.createElement('dt'); dt.textContent = k + ':';
+    const dd = document.createElement('dd'); dd.textContent = v;
+    dl.append(dt, dd);
+  }
+  caja.append(dl);
+  if (url) {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Foto reducida';
+    caja.append(img);
+  }
+  document.getElementById('resultados').prepend(caja);
+  lineas.push(Object.entries(datos).map(([k, v]) => k + ': ' + v).join(' | '));
+  document.getElementById('reporte').value = lineas.join('\n');
+}
+
+if (typeof document !== 'undefined') {
+  const instalada = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  document.getElementById('modo').textContent = 'Modo: ' + (instalada ? 'web app de inicio' : 'Safari');
+  lineas.push('Modo: ' + (instalada ? 'web app de inicio' : 'Safari') + ' | ' + navigator.userAgent);
+  for (const id of ['a', 'b', 'c', 'd']) {
+    document.getElementById(id).addEventListener('change', async (ev) => {
+      const files = [...ev.target.files];
+      for (let i = 0; i < files.length; i++) await procesar(files[i], id.toUpperCase(), i + 1);
+      ev.target.value = '';
+    });
+  }
+}
+</script>
+</body>
+</html>
