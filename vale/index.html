@@ -2,174 +2,538 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Prueba del selector</title>
+<title>PROTOTIPO · Flujo de captura</title>
+<!--
+  PROTOTIPO DESCARTABLE. Ticket: Flujo de captura y asociación.
+  Tres variantes del flujo de captura, switchables con ?variant=A|B|C y la barra negra de abajo.
+  Todo vive en memoria: nada se sube ni se guarda. Recargar la página reinicia todo.
+  Usar fotos personales, nunca clínicas.
+-->
 <style>
-  body { font: 16px/1.4 -apple-system, system-ui, sans-serif; margin: 16px; max-width: 700px; }
-  .aviso { background: #fff3cd; padding: 10px; border-radius: 8px; }
-  label { display: block; margin: 14px 0; font-weight: 600; }
-  input[type=file] { display: block; margin-top: 6px; font-weight: 400; width: 100%; }
-  .foto { border-top: 1px solid #ccc; padding: 10px 0; }
-  .foto img { max-width: 100%; display: block; margin-top: 6px; }
-  dt { font-weight: 600; float: left; clear: left; margin-right: 6px; }
-  dd { margin: 0 0 2px; }
-  textarea { width: 100%; height: 180px; font: 12px monospace; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 17px/1.35 -apple-system, system-ui, sans-serif; background: #f4f4f2; color: #222; -webkit-tap-highlight-color: transparent; }
+  #app { max-width: 520px; margin: 0 auto; padding: 12px 14px 160px; min-height: 100vh; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  button, label { font: inherit; border: 0; background: none; color: inherit; cursor: pointer; text-align: left; }
+  .btn { display: block; width: 100%; padding: 14px; border-radius: 12px; background: #fff; border: 1px solid #ccc; text-align: center; margin: 8px 0; }
+  .grande { padding: 22px; font-size: 20px; font-weight: 600; background: #1f6feb; color: #fff; border: 0; }
+  .primario { background: #1f6feb; color: #fff; border: 0; font-weight: 600; }
+  .link { color: #1f6feb; padding: 10px; display: block; margin: 4px auto; text-align: center; }
+  .peligro { color: #b00020; }
+  .inst { background: #e8eefc; color: #1f3f8a; padding: 7px 12px; border-radius: 20px; font-size: 15px; }
+  .pend { background: #fff3cd; padding: 7px 12px; border-radius: 20px; font-size: 15px; }
+  .pend.off { background: #ffd6d6; }
+  .ok { color: #2a7a2a; font-size: 15px; }
+  input[type=search], input[type=text], input[type=date], textarea { width: 100%; font: inherit; padding: 12px; border: 1px solid #bbb; border-radius: 10px; background: #fff; margin: 4px 0; }
+  textarea { height: 80px; }
+  .fila-p { display: block; width: 100%; background: #fff; border-radius: 10px; padding: 12px; margin: 6px 0; border: 1px solid #ddd; }
+  .fila-p .nom { font-weight: 600; display: block; }
+  .nota { display: block; color: #7a5b00; font-size: 15px; }
+  .meta { display: block; color: #777; font-size: 14px; }
+  .fila-p.nuevo { color: #1f6feb; font-weight: 600; }
+  .fila-p.sel { border-color: #1f6feb; background: #eef4ff; }
+  .fila-p.hecho { border-left: 6px solid #2a7a2a; }
+  .tag { font-style: normal; font-size: 12px; background: #ddd; padding: 1px 6px; border-radius: 6px; font-weight: 400; }
+  .ths { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .th { width: 76px; height: 76px; border-radius: 8px; background-size: cover; background-position: center; position: relative; padding: 0; flex: none; }
+  .th .est { position: absolute; right: 3px; bottom: 3px; background: #fff; border-radius: 10px; font-size: 12px; padding: 0 5px; }
+  .th.pendiente .est { background: #ffd27a; } .th.subiendo .est { background: #9cc3ff; } .th.espera .est { background: #ccc; }
+  .th .fd { position: absolute; left: 4px; top: 3px; font-size: 11px; color: #333; }
+  .th.big { width: 120px; height: 120px; }
+  .foto-grande { width: 100%; aspect-ratio: 3/4; max-height: 45vh; border-radius: 10px; background-size: contain; background-repeat: no-repeat; background-position: center; }
+  .disparo { display: flex; align-items: center; justify-content: center; flex-direction: column; width: 210px; height: 210px; margin: 24px auto 12px; border-radius: 50%; background: #1f6feb; color: #fff; font-size: 22px; font-weight: 600; text-align: center; }
+  .disparo span { font-size: 54px; line-height: 1; }
+  .aviso { display: block; width: 100%; background: #fff3cd; border: 1px solid #e5c55a; border-radius: 10px; padding: 12px; margin: 8px 0; }
+  .error { color: #b00020; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid .fila-p { margin: 0; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: flex-end; z-index: 10; }
+  .caja { background: #fff; width: 100%; max-width: 520px; margin: 0 auto; max-height: 90vh; overflow: auto; border-radius: 16px 16px 0 0; padding: 16px 16px 150px; }
+  .toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 10px 16px; border-radius: 20px; z-index: 20; font-size: 15px; white-space: nowrap; }
+  .prog { height: 6px; background: #ddd; border-radius: 3px; margin: 4px 0 12px; }
+  .prog div { height: 100%; background: #1f6feb; border-radius: 3px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row .btn { flex: 1; }
+  .ref { display: flex; gap: 10px; align-items: center; background: #fff; border-radius: 10px; padding: 8px; margin: 10px 0; }
+  .hint { color: #777; font-size: 14px; }
+  .centro { padding-top: 15vh; }
+  h1 { font-size: 24px; margin: 8px 0 2px; }
+  h2 { font-size: 20px; margin: 10px 0; }
+  h3 { font-size: 13px; text-transform: uppercase; color: #666; margin: 18px 0 4px; letter-spacing: .04em; }
+  h4 { margin: 14px 0 2px; font-size: 15px; }
+  h4 small { color: #777; font-weight: 400; }
+  .oculto { position: fixed; left: -1000px; top: 0; opacity: 0; width: 1px; height: 1px; }
+  #barra { position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #111; color: #fff; border-radius: 18px; padding: 6px 10px; z-index: 30; box-shadow: 0 4px 16px rgba(0,0,0,.35); font-size: 14px; white-space: nowrap; }
+  #barra .f { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  #barra button { color: #fff; padding: 4px 8px; border-radius: 8px; }
+  #barra .f + .f { margin-top: 4px; }
+  #barra .f + .f button { background: #333; font-size: 12px; }
+  #vlabel { min-width: 170px; text-align: center; font-weight: 600; }
+  #estado { position: fixed; inset: 0 0 auto 0; max-height: 60vh; overflow: auto; background: #111; color: #9f9; font: 11px/1.3 monospace; z-index: 25; padding: 8px; white-space: pre-wrap; }
+  #estado button { background: #333; color: #fff; padding: 6px 10px; border-radius: 8px; font: 12px sans-serif; }
 </style>
 </head>
 <body>
-<h1>Prueba del selector</h1>
-<p class="aviso">Usá fotos personales, nunca clínicas. Esta página procesa todo en el teléfono y no envía nada.</p>
-<p id="modo"></p>
-
-<label>A. Selector con <code>image/*</code>
-  <input type="file" id="a" accept="image/*" multiple></label>
-<label>B. Selector con HEIC y JPEG
-  <input type="file" id="b" accept="image/heic,image/heif,image/jpeg" multiple></label>
-<label>C. Selector sin filtro
-  <input type="file" id="c" multiple></label>
-<label>D. Cámara con <code>capture</code>
-  <input type="file" id="d" accept="image/*" capture="environment"></label>
-
-<div id="resultados"></div>
-<h2>Reporte para copiar</h2>
-<textarea id="reporte" readonly></textarea>
+<div id="app"></div>
+<div id="estado" hidden></div>
+<div id="barra">
+  <div class="f"><button data-a="varPrev">‹</button><span id="vlabel"></span><button data-a="varNext">›</button></div>
+  <div class="f"><button data-a="togSenal" id="bSenal"></button><button data-a="togSim" id="bSim"></button><button data-a="resetToques" id="bToq"></button><button data-a="togEstado">estado</button></div>
+</div>
+<input type="file" id="cam" class="oculto" accept="image/*" capture="environment">
+<input type="file" id="carrete" class="oculto" accept="image/*" multiple>
 
 <script>
-// <parser>
-function findTiff(bytes) {
-  // "Exif\0\0" seguido de un encabezado TIFF. Sirve para JPEG y HEIC.
-  for (let i = 0; i + 10 < bytes.length; i++) {
-    if (bytes[i] !== 0x45 || bytes[i + 1] !== 0x78 || bytes[i + 2] !== 0x69 || bytes[i + 3] !== 0x66 ||
-        bytes[i + 4] !== 0 || bytes[i + 5] !== 0) continue;
-    const a = bytes[i + 6], b = bytes[i + 7], c = bytes[i + 8], d = bytes[i + 9];
-    if ((a === 0x49 && b === 0x49 && c === 0x2a && d === 0) ||
-        (a === 0x4d && b === 0x4d && c === 0 && d === 0x2a)) return i + 6;
-  }
-  return -1;
+// ---------- utilidades ----------
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const z = (n) => String(n).padStart(2, '0');
+const fl = (d) => `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+const HOY = fl(new Date());
+const haceDias = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return fl(d); };
+const INST = ['Clínica Norte', 'Sanatorio Sur'];
+const VAR = { A: 'Lista de Pacientes', B: 'Cámara primero', C: 'Ronda del día' };
+const ESTADO = { subida: '✓', subiendo: '↑', pendiente: '⏳', espera: 'sin Paciente' };
+
+let seq = 0;
+const nuevaFoto = (fecha, institucion, extra = {}) =>
+  ({ id: ++seq, fecha, institucion, nota: '', estado: 'subida', hue: (seq * 47) % 360, url: null, ...extra });
+
+// nombre, apellido, nota, archivado, [[días atrás, institución]]
+const SEMILLA = [
+  ['María', 'Gómez', '', false, [[17, 0], [10, 0], [3, 0]]],
+  ['María', 'Gómez', 'la de la hab. 12', false, [[9, 1], [2, 1]]],
+  ['Jorge', 'Fernández', '', false, [[24, 0], [17, 0], [10, 0], [3, 0]]],
+  ['Ana', 'Rodríguez', '', false, [[7, 0], [3, 0]]],
+  ['Luis', 'Martínez', 'dos heridas: talón y sacro', false, [[14, 0], [10, 0], [6, 0]]],
+  ['Rosa', 'López', '', false, [[6, 0]]],
+  ['Carlos', 'Pereyra', '', false, [[20, 0], [13, 0], [6, 1], [2, 1]]],
+  ['Raúl', 'Medina', '', false, [[4, 0]]],
+  ['Elena', 'Sosa', '', false, [[16, 1], [9, 1], [2, 1]]],
+  ['Héctor', 'Díaz', '', false, [[5, 1], [2, 1]]],
+  ['Beatriz', 'Romero', '', false, [[12, 1], [5, 1]]],
+  ['Tomás', 'Acosta', 'menor, 9 años', false, [[8, 1], [1, 1]]],
+  ['Silvia', 'Benítez', '', false, [[30, 1], [23, 1], [9, 1]]],
+  ['Norma', 'Herrera', '', true, [[90, 0], [83, 0]]],
+  ['Oscar', 'Giménez', '', true, [[120, 1]]],
+];
+
+const S = {
+  v: (new URLSearchParams(location.search).get('variant') || 'A').toUpperCase(),
+  instDia: null,
+  pacientes: SEMILLA.map(([nombre, apellido, nota, archivado, fs]) =>
+    ({ id: ++seq, nombre, apellido, nota, archivado, fotos: fs.map(([d, i]) => nuevaFoto(haceDias(d), INST[i])) })),
+  bandeja: [],
+  senal: true,
+  simuladas: !matchMedia('(pointer: coarse)').matches,
+  toques: 0,
+  q: '',
+  modal: null,
+  toast: '',
+  destino: null,
+  origen: null,
+  A: { pid: null, inst: null },
+  B: { asignando: false, ver: null },
+  C: { sel: null, ronda: null, i: 0, lista: false, fin: false },
+};
+if (!VAR[S.v]) S.v = 'A';
+
+// ---------- dominio ----------
+const P = (id) => S.pacientes.find((p) => p.id === +id);
+const ultima = (p, antesDe) => p.fotos.filter((f) => !antesDe || f.fecha < antesDe)
+  .reduce((m, f) => (!m || f.fecha >= m.fecha ? f : m), null);
+const instActual = (p) => ultima(p)?.institucion ?? null;
+const todas = () => S.pacientes.flatMap((p) => p.fotos);
+const sinSubir = () => todas().filter((f) => f.estado !== 'subida');
+const buscarFoto = (id) => [...todas(), ...S.bandeja].find((f) => f.id === +id);
+const fotosHoy = (p) => p.fotos.filter((f) => f.fecha === HOY);
+const delDia = () => S.pacientes.filter((p) => !p.archivado && instActual(p) === S.instDia)
+  .sort((a, b) => ultima(b).fecha.localeCompare(ultima(a).fecha));
+const buscar = (q) => {
+  const t = norm(q).split(/\s+/).filter(Boolean);
+  return S.pacientes.filter((p) => { const h = norm(`${p.nombre} ${p.apellido} ${p.nota}`); return t.every((x) => h.includes(x)); })
+    .sort((a, b) => a.archivado - b.archivado || a.apellido.localeCompare(b.apellido));
+};
+const otraInst = (i) => INST[(INST.indexOf(i) + 1) % INST.length];
+
+// ---------- piezas de UI ----------
+const nombre = (p) => `${esc(p.apellido)}, ${esc(p.nombre)}`;
+const nota = (p) => (p.nota ? `<small class="nota">${esc(p.nota)}</small>` : '');
+const relativo = (f) => { const d = Math.round((new Date(HOY) - new Date(f)) / 864e5); return d === 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`; };
+const fechaCorta = (f) => { const [, m, d] = f.split('-'); return `${+d}/${+m}`; };
+const etiquetaFecha = (d) => {
+  if (d === HOY) return 'Hoy';
+  const [y, m, dd] = d.split('-').map(Number);
+  return new Date(y, m - 1, dd).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric', ...(y !== +HOY.slice(0, 4) ? { year: 'numeric' } : {}) });
+};
+const fondo = (f) => (f.url ? `background-image:url(${f.url})` : `background:hsl(${f.hue} 45% 72%)`);
+const thumb = (f, big) => `<button class="th ${big ? 'big' : ''} ${f.estado}" data-a="verFoto" data-id="${f.id}" style="${fondo(f)}">`
+  + `<span class="est">${ESTADO[f.estado]}</span>${f.url ? '' : `<span class="fd">${fechaCorta(f.fecha)}</span>`}</button>`;
+const indicadorHTML = () => {
+  const n = sinSubir().length;
+  return n ? `<button class="pend ${S.senal ? '' : 'off'}" data-a="verPendientes">${S.senal ? '↑' : '⚠'} ${n} sin subir</button>`
+    : '<span class="ok">✓ todo subido</span>';
+};
+const indicador = () => `<span class="indicador">${indicadorHTML()}</span>`;
+const instChip = () => `<button class="inst" data-a="elegirInstDia">📍 ${esc(S.instDia)} ▾</button>`;
+const fila = (p, accion = 'usar', extra = '') => {
+  const u = ultima(p);
+  return `<button class="fila-p ${extra}" data-a="${accion}" data-id="${p.id}"><span class="nom">${nombre(p)}${p.archivado ? ' <em class="tag">archivado</em>' : ''}</span>${nota(p)}`
+    + `<span class="meta">${u ? `${esc(u.institucion)} · última Foto ${relativo(u.fecha)}` : 'sin Fotos'}</span></button>`;
+};
+const buscador = (ph = 'Buscar Paciente…') =>
+  `<input id="q" type="search" placeholder="${ph}" value="${esc(S.q)}" autocomplete="off" autocorrect="off" autocapitalize="words"><div id="res">${V().res()}</div>`;
+const resultados = (accion = 'usar') => {
+  if (!S.q.trim()) return '';
+  return buscar(S.q).map((p) => fila(p, accion)).join('')
+    + `<button class="fila-p nuevo" data-a="nuevo">+ Nuevo Paciente «${esc(S.q.trim())}»</button>`;
+};
+const historial = (p) => {
+  const g = {};
+  p.fotos.forEach((f) => (g[f.fecha] ??= []).push(f));
+  const fechas = Object.keys(g).sort().reverse();
+  if (!fechas.length) return '<p class="hint">Sin Fotos todavía.</p>';
+  return fechas.map((d) => `<h4>${etiquetaFecha(d)} <small>${[...new Set(g[d].map((f) => esc(f.institucion)))].join(', ')}</small></h4>`
+    + `<div class="ths">${g[d].map((f) => thumb(f)).join('')}</div>`).join('');
+};
+const botonCamara = (dest, clase = 'btn grande', texto = '📷 Sacar Foto') =>
+  `<label class="${clase}" for="cam" data-a="camara" data-dest="${dest}">${texto}</label>`;
+const botonCarrete = (dest) => `<label class="link" for="carrete" data-a="carrete" data-dest="${dest}">Elegir del carrete</label>`;
+
+// ---------- variante A: lista de Pacientes ----------
+const VA = {
+  render() {
+    const p = S.A.pid && P(S.A.pid);
+    if (p) {
+      return `<header><button class="link" style="margin:0;padding:0" data-a="A_atras">‹ Pacientes</button>${indicador()}</header>`
+        + `<h1>${nombre(p)}</h1>${nota(p)}`
+        + `<p class="row hint">Fotos de hoy en <button class="inst" data-a="A_inst">${esc(S.A.inst)} ▾</button></p>`
+        + botonCamara(p.id) + botonCarrete(p.id)
+        + historial(p);
+    }
+    return `<header>${instChip()}${indicador()}</header>${buscador()}`;
+  },
+  res() {
+    if (S.q.trim()) return resultados();
+    return `<h3>En ${esc(S.instDia)}</h3>${delDia().map((p) => fila(p)).join('')}`
+      + '<p class="hint">Buscá para ver Pacientes de otra Institución o archivados.</p>'
+      + '<button class="btn" data-a="nuevo">+ Nuevo Paciente</button>';
+  },
+  usar(p) { S.A.pid = p.id; S.A.inst = S.instDia; },
+};
+
+// ---------- variante B: cámara primero ----------
+const VB = {
+  render() {
+    if (S.B.asignando && S.bandeja.length) {
+      const recientes = delDia().slice(0, 8);
+      return `<header><h2 style="margin:0">¿De quién son?</h2>${indicador()}</header>`
+        + `<div class="ths">${S.bandeja.map((f) => thumb(f)).join('')}</div>`
+        + botonCamara('bandeja', 'btn', '📷 Sacar otra')
+        + `<h3>Recientes en ${esc(S.instDia)}</h3><div class="grid">${recientes.map((p) => fila(p)).join('')}</div>`
+        + `<h3>Otro</h3>${buscador()}`
+        + '<button class="btn" data-a="nuevo">+ Nuevo Paciente</button>'
+        + '<button class="link" data-a="B_luego">Asignar más tarde</button>';
+    }
+    const p = S.B.ver && P(S.B.ver);
+    if (p) {
+      return `<header><button class="link" style="margin:0;padding:0" data-a="B_atras">‹ Inicio</button>${indicador()}</header>`
+        + `<h1>${nombre(p)}</h1>${nota(p)}${historial(p)}`;
+    }
+    const hoy = S.pacientes.filter((x) => fotosHoy(x).length)
+      .sort((a, b) => Math.max(...fotosHoy(b).map((f) => f.id)) - Math.max(...fotosHoy(a).map((f) => f.id)));
+    return `<header>${instChip()}${indicador()}</header>`
+      + (S.bandeja.length ? `<button class="aviso" data-a="B_asignar">⚠ ${S.bandeja.length} Foto${S.bandeja.length > 1 ? 's' : ''} sin Paciente. Tocá para asignar.</button>` : '')
+      + botonCamara('bandeja', 'disparo', '<span>📷</span>Sacar Foto')
+      + botonCarrete('bandeja')
+      + `<h3>Hoy</h3>${hoy.length ? hoy.map((x) => `<button class="fila-p" data-a="B_ver" data-id="${x.id}"><span class="nom">${nombre(x)}</span>${nota(x)}`
+        + `<span class="ths">${fotosHoy(x).map((f) => `<span class="th ${f.estado}" style="${fondo(f)};width:44px;height:44px"><span class="est">${ESTADO[f.estado]}</span></span>`).join('')}</span></button>`).join('')
+        : '<p class="hint">Todavía no sacaste Fotos hoy.</p>'}`
+      + `<h3>Buscar Paciente</h3>${buscador()}`;
+  },
+  res() { return resultados(S.B.asignando ? 'usar' : 'B_ver'); },
+  usar(p) {
+    S.bandeja.forEach((f) => { f.estado = 'pendiente'; });
+    p.fotos.push(...S.bandeja);
+    S.toast = `${S.bandeja.length} Foto${S.bandeja.length > 1 ? 's' : ''} → ${p.apellido}, ${p.nombre}`;
+    S.bandeja = [];
+    S.B.asignando = false;
+  },
+};
+
+// ---------- variante C: ronda del día ----------
+const VC = {
+  render() {
+    const C = S.C;
+    if (!C.ronda) {
+      if (!C.sel) C.sel = delDia().map((p) => p.id);
+      const ids = [...new Set([...delDia().map((p) => p.id), ...C.sel])];
+      return `<header>${instChip()}${indicador()}</header><h1>Ronda de hoy</h1><p class="hint">Marcá a quién vas a ver. Después la app te los muestra de a uno.</p>`
+        + ids.map((id) => { const p = P(id); const on = C.sel.includes(id);
+          return `<button class="fila-p ${on ? 'sel' : ''}" data-a="C_toggle" data-id="${id}"><span class="nom">${on ? '☑' : '☐'} ${nombre(p)}</span>${nota(p)}<span class="meta">última Foto ${relativo(ultima(p)?.fecha ?? HOY)}</span></button>`; }).join('')
+        + `<h3>Sumar otro</h3>${buscador()}`
+        + '<button class="btn" data-a="nuevo">+ Nuevo Paciente</button>'
+        + `<button class="btn primario" data-a="C_empezar">Empezar ronda (${C.sel.length})</button>`;
+    }
+    if (C.lista) {
+      return `<header><h2 style="margin:0">Ronda</h2>${indicador()}</header>`
+        + C.ronda.map((id, i) => { const p = P(id); const n = fotosHoy(p).length;
+          return `<button class="fila-p ${n ? 'hecho' : ''} ${i === C.i ? 'sel' : ''}" data-a="C_ir" data-i="${i}"><span class="nom">${i + 1}. ${nombre(p)}</span>${nota(p)}<span class="meta">${n ? `${n} Foto${n > 1 ? 's' : ''} hoy` : 'sin Fotos hoy'}</span></button>`; }).join('')
+        + `<h3>Agregar a la ronda</h3>${buscador()}`
+        + '<button class="btn" data-a="nuevo">+ Nuevo Paciente</button>'
+        + '<button class="btn primario" data-a="C_cerrarLista">Volver al Paciente</button>'
+        + '<button class="link" data-a="C_terminar">Terminar ronda</button>';
+    }
+    if (C.fin) {
+      const total = C.ronda.reduce((s, id) => s + fotosHoy(P(id)).length, 0);
+      const faltan = C.ronda.filter((id) => !fotosHoy(P(id)).length);
+      return `<header><h2 style="margin:0">Ronda terminada</h2>${indicador()}</header>`
+        + `<p>${C.ronda.length} Pacientes, ${total} Foto${total === 1 ? '' : 's'}.${faltan.length ? ` ${faltan.length} sin Fotos hoy.` : ''}</p>`
+        + C.ronda.map((id, i) => { const p = P(id); const fs = fotosHoy(p);
+          return `<button class="fila-p ${fs.length ? 'hecho' : ''}" data-a="C_ir" data-i="${i}"><span class="nom">${nombre(p)}</span><span class="ths">${fs.map((f) => `<span class="th ${f.estado}" style="${fondo(f)};width:44px;height:44px"><span class="est">${ESTADO[f.estado]}</span></span>`).join('') || '<span class="meta">sin Fotos hoy</span>'}</span></button>`; }).join('')
+        + '<button class="btn" data-a="C_volver">Volver a la ronda</button>'
+        + '<button class="link" data-a="C_otra">Armar otra ronda</button>';
+    }
+    const p = P(C.ronda[C.i]);
+    const prev = ultima(p, HOY);
+    const hoy = fotosHoy(p);
+    const ultimo = C.i === C.ronda.length - 1;
+    return `<header><button class="inst" data-a="C_abrirLista">☰ ${C.i + 1} de ${C.ronda.length}</button>${indicador()}</header>`
+      + `<div class="prog"><div style="width:${((C.i + 1) / C.ronda.length) * 100}%"></div></div>`
+      + `<h1>${nombre(p)}</h1>${nota(p)}`
+      + (prev ? `<div class="ref">${thumb(prev, true)}<span>Foto anterior<br><small class="hint">${relativo(prev.fecha)}, ${esc(prev.institucion)}</small></span></div>` : '<p class="hint">Primera Foto de este Paciente.</p>')
+      + (hoy.length ? `<h4>Hoy</h4><div class="ths">${hoy.map((f) => thumb(f)).join('')}</div>` : '')
+      + botonCamara(p.id, hoy.length ? 'btn' : 'btn grande', hoy.length ? '📷 Otra Foto' : '📷 Sacar Foto')
+      + `<div class="row"><button class="btn" data-a="C_prev" ${C.i ? '' : 'disabled style="opacity:.4"'}>‹ Anterior</button>`
+      + `<button class="btn ${hoy.length ? 'primario' : ''}" data-a="C_next">${ultimo ? 'Terminar' : hoy.length ? 'Siguiente ›' : 'Saltar ›'}</button></div>`
+      + botonCarrete(p.id);
+  },
+  res() { return resultados(); },
+  usar(p) {
+    const C = S.C;
+    if (!C.ronda) { if (!C.sel.includes(p.id)) C.sel.push(p.id); return; }
+    if (!C.ronda.includes(p.id)) C.ronda.splice(C.i + 1, 0, p.id);
+    C.i = C.ronda.indexOf(p.id); C.lista = false; C.fin = false;
+  },
+};
+
+const VARIANTES = { A: VA, B: VB, C: VC };
+const V = () => VARIANTES[S.v];
+
+// ---------- modales ----------
+const MODAL = {
+  inst: () => `<h2>¿Dónde atendés hoy?</h2>${INST.map((n, i) => `<button class="btn ${n === S.instDia ? 'primario' : ''}" data-a="setInstDia" data-i="${i}">${n}</button>`).join('')}`
+    + '<p class="hint">Se recuerda todo el día. Se puede corregir en cada Foto.</p><button class="link" data-a="cerrar">Cancelar</button>',
+  nuevo: () => {
+    const m = S.modal;
+    return `<h2>Nuevo Paciente</h2>`
+      + `<input type="text" id="n_nombre" placeholder="Nombre" value="${esc(m.n)}" autocapitalize="words">`
+      + `<input type="text" id="n_apellido" placeholder="Apellido" value="${esc(m.a)}" autocapitalize="words">`
+      + `<input type="text" id="n_nota" placeholder="Nota (opcional, p. ej. para distinguir homónimos)" value="${esc(m.no)}">`
+      + (m.err ? `<p class="error">${esc(m.err)}</p>` : '')
+      + (m.homo || []).map((id) => `<button class="fila-p" data-a="usar" data-id="${id}">Es este: ${nombre(P(id))}${nota(P(id))}</button>`).join('')
+      + `<button class="btn primario" data-a="guardarNuevo">${m.homo?.length ? 'Guardar igual' : 'Guardar'}</button><button class="link" data-a="cerrar">Cancelar</button>`;
+  },
+  foto: () => {
+    const f = buscarFoto(S.modal.id);
+    const p = S.pacientes.find((x) => x.fotos.includes(f));
+    return `<div class="foto-grande" style="${fondo(f)}"></div>`
+      + `<p>${p ? nombre(p) : 'Sin Paciente (bandeja)'} · ${ESTADO[f.estado]}${f.estado === 'subida' ? ' subida' : f.estado === 'espera' ? '' : ' sin subir'}</p>`
+      + `<label>Fecha<input type="date" id="f_fecha" value="${f.fecha}"></label>`
+      + `<p class="row">Institución <button class="inst" data-a="fotoInst">${esc(f.institucion)} ▾</button></p>`
+      + `<label>Nota<textarea id="f_nota" placeholder="Opcional">${esc(f.nota)}</textarea></label>`
+      + '<button class="btn primario" data-a="fotoListo">Listo</button>'
+      + '<button class="link peligro" data-a="fotoBorrar">Borrar esta Foto</button>';
+  },
+  pendientes: () => {
+    const ps = S.pacientes.flatMap((p) => p.fotos.filter((f) => f.estado !== 'subida').map((f) => [p, f]));
+    return '<h2>Fotos sin subir</h2>'
+      + (ps.length ? ps.map(([p, f]) => `<div class="row" style="margin:6px 0">${thumb(f)}<span>${nombre(p)}<br><small class="hint">${f.estado === 'subiendo' ? 'Subiendo…' : S.senal ? 'En cola' : 'Sin señal. Se reintenta mientras la app esté abierta.'}</small></span></div>`).join('') : '<p>Todo subido.</p>')
+      + (S.bandeja.length ? `<p class="aviso">${S.bandeja.length} Foto(s) sin Paciente: no se suben hasta asignarlas.</p>` : '')
+      + '<button class="btn" data-a="cerrar">Cerrar</button>';
+  },
+};
+
+const pantallaInst = () => `<div class="centro"><h1>¿Dónde atendés hoy?</h1>`
+  + INST.map((n, i) => `<button class="btn grande" data-a="setInstDia" data-i="${i}">${n}</button>`).join('')
+  + '<p class="hint">Se recuerda todo el día. Se puede corregir en cada Foto.</p></div>';
+
+// ---------- acciones ----------
+function guardarFotoForm() {
+  const f = buscarFoto(S.modal.id);
+  if (!f) return;
+  const fe = $('#f_fecha')?.value; if (fe) f.fecha = fe;
+  const no = $('#f_nota'); if (no) f.nota = no.value;
+}
+function irVariante(d) {
+  const ks = Object.keys(VAR);
+  S.v = ks[(ks.indexOf(S.v) + d + ks.length) % ks.length];
+  history.replaceState(null, '', `?variant=${S.v}`);
+  S.q = ''; S.modal = null; S.toques = 0;
 }
 
-function readExif(bytes) {
-  const out = { exif: false, dateTimeOriginal: null, offsetTimeOriginal: null, dateTime: null, gps: false };
-  const start = findTiff(bytes);
-  if (start < 0) return out;
-  out.exif = true;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const le = bytes[start] === 0x49;
-  const u16 = (o) => view.getUint16(start + o, le);
-  const u32 = (o) => view.getUint32(start + o, le);
-  const ascii = (entry) => {
-    const count = u32(entry + 4);
-    const offset = count <= 4 ? entry + 8 : u32(entry + 8);
-    let text = '';
-    for (let i = 0; i < count - 1; i++) text += String.fromCharCode(bytes[start + offset + i]);
-    return text;
-  };
-  const entries = (ifd) => {
-    const list = [];
-    const count = u16(ifd);
-    for (let i = 0; i < count; i++) {
-      const entry = ifd + 2 + i * 12;
-      list.push({ tag: u16(entry), entry });
-    }
-    return list;
-  };
-  try {
-    let exifIfd = 0, gpsIfd = 0;
-    for (const { tag, entry } of entries(u32(4))) {
-      if (tag === 0x0132) out.dateTime = ascii(entry);
-      if (tag === 0x8769) exifIfd = u32(entry + 8);
-      if (tag === 0x8825) gpsIfd = u32(entry + 8);
-    }
-    if (exifIfd) for (const { tag, entry } of entries(exifIfd)) {
-      if (tag === 0x9003) out.dateTimeOriginal = ascii(entry);
-      if (tag === 0x9011) out.offsetTimeOriginal = ascii(entry);
-    }
-    if (gpsIfd) out.gps = entries(gpsIfd).some(({ tag }) => tag === 0x0002);
-  } catch (e) {
-    out.error = String(e);
-  }
-  return out;
+const ACC = {
+  // barra del prototipo
+  varPrev: () => irVariante(-1),
+  varNext: () => irVariante(1),
+  togSenal: () => { S.senal = !S.senal; if (!S.senal) todas().forEach((f) => { if (f.estado === 'subiendo') f.estado = 'pendiente'; }); },
+  togSim: () => { S.simuladas = !S.simuladas; },
+  resetToques: () => { S.toques = 0; },
+  togEstado: () => { $('#estado').hidden = !$('#estado').hidden; },
+  nuevoDia: () => { S.instDia = null; S.C = { sel: null, ronda: null, i: 0, lista: false, fin: false }; S.A.pid = null; S.B = { asignando: false, ver: null }; },
+  // compartidas
+  setInstDia: (d) => { S.instDia = INST[+d.i]; S.modal = null; S.C.sel = null; },
+  elegirInstDia: () => { S.modal = { tipo: 'inst' }; },
+  verPendientes: () => { S.modal = { tipo: 'pendientes' }; },
+  cerrar: () => { S.modal = null; },
+  usar: (d) => {
+    const p = P(d.id);
+    if (p.archivado) { p.archivado = false; S.toast = `${p.apellido}, ${p.nombre}: reactivado`; }
+    S.q = ''; S.modal = null;
+    V().usar(p);
+  },
+  nuevo: () => {
+    const w = S.q.trim().split(/\s+/).filter(Boolean);
+    S.modal = { tipo: 'nuevo', n: w.length > 1 ? w[0] : '', a: w.length > 1 ? w.slice(1).join(' ') : (w[0] || ''), no: '' };
+  },
+  guardarNuevo: () => {
+    const m = S.modal;
+    m.n = $('#n_nombre').value.trim(); m.a = $('#n_apellido').value.trim(); m.no = $('#n_nota').value.trim();
+    if (!m.n || !m.a) { m.err = 'Faltan nombre o apellido.'; return; }
+    const homo = S.pacientes.filter((p) => norm(p.nombre) === norm(m.n) && norm(p.apellido) === norm(m.a));
+    if (homo.length && !m.homo) { m.homo = homo.map((p) => p.id); m.err = 'Ya existe alguien con ese nombre. ¿Es la misma persona? Si no, agregá una nota para distinguirlos.'; return; }
+    const p = { id: ++seq, nombre: m.n, apellido: m.a, nota: m.no, archivado: false, fotos: [] };
+    S.pacientes.push(p); S.modal = null; S.q = ''; S.toast = 'Paciente creado';
+    V().usar(p);
+  },
+  camara: (d, e) => {
+    S.destino = d.dest; S.origen = 'cam';
+    if (S.simuladas) { e.preventDefault(); recibir([null]); return false; }
+    return false; // dejar que el label abra la cámara
+  },
+  carrete: (d, e) => {
+    S.destino = d.dest; S.origen = 'carrete';
+    if (S.simuladas) { e.preventDefault(); recibir([null, null, null]); return false; }
+    return false;
+  },
+  verFoto: (d) => { if (S.modal?.tipo === 'foto') guardarFotoForm(); S.modal = { tipo: 'foto', id: +d.id }; },
+  fotoInst: () => { guardarFotoForm(); const f = buscarFoto(S.modal.id); f.institucion = otraInst(f.institucion); },
+  fotoListo: () => { guardarFotoForm(); S.modal = null; },
+  fotoBorrar: () => {
+    if (!confirm('¿Borrar esta Foto?')) return false;
+    const id = S.modal.id;
+    S.pacientes.forEach((p) => { p.fotos = p.fotos.filter((f) => f.id !== id); });
+    S.bandeja = S.bandeja.filter((f) => f.id !== id);
+    S.modal = null; S.toast = 'Foto borrada';
+  },
+  // A
+  A_atras: () => { S.A.pid = null; S.q = ''; },
+  A_inst: () => { S.A.inst = otraInst(S.A.inst); },
+  // B
+  B_asignar: () => { S.B.asignando = true; },
+  B_luego: () => { S.B.asignando = false; S.q = ''; },
+  B_ver: (d) => { S.B.ver = +d.id; S.q = ''; },
+  B_atras: () => { S.B.ver = null; },
+  // C
+  C_toggle: (d) => { const s = S.C.sel; const i = s.indexOf(+d.id); i < 0 ? s.push(+d.id) : s.splice(i, 1); },
+  C_empezar: () => {
+    const ids = [...new Set([...delDia().map((p) => p.id), ...S.C.sel])].filter((id) => S.C.sel.includes(id));
+    if (!ids.length) { S.toast = 'Marcá al menos un Paciente'; return; }
+    Object.assign(S.C, { ronda: ids, i: 0, lista: false, fin: false }); S.q = '';
+  },
+  C_next: () => { if (S.C.i < S.C.ronda.length - 1) S.C.i++; else S.C.fin = true; },
+  C_prev: () => { if (S.C.i > 0) S.C.i--; },
+  C_abrirLista: () => { S.C.lista = true; },
+  C_cerrarLista: () => { S.C.lista = false; S.q = ''; },
+  C_ir: (d) => { Object.assign(S.C, { i: +d.i, lista: false, fin: false }); },
+  C_terminar: () => { Object.assign(S.C, { lista: false, fin: true }); },
+  C_volver: () => { S.C.fin = false; },
+  C_otra: () => { Object.assign(S.C, { sel: null, ronda: null, i: 0, lista: false, fin: false }); },
+};
+
+function recibir(files) {
+  const aBandeja = S.destino === 'bandeja';
+  const fotos = files.map((file) => nuevaFoto(
+    S.origen === 'cam' ? HOY : file ? fl(new Date(file.lastModified)) : haceDias(30 + Math.floor(Math.random() * 60)),
+    S.v === 'A' && S.A.pid ? S.A.inst : S.instDia,
+    { estado: aBandeja ? 'espera' : 'pendiente', url: file ? URL.createObjectURL(file) : null }));
+  if (aBandeja) { S.bandeja.push(...fotos); S.B.asignando = true; S.B.ver = null; }
+  else P(S.destino).fotos.push(...fotos);
+  S.toast = aBandeja ? `${fotos.length} Foto${fotos.length > 1 ? 's' : ''} en la bandeja` : `${fotos.length} Foto${fotos.length > 1 ? 's' : ''} agregada${fotos.length > 1 ? 's' : ''}`;
+  render();
 }
-// </parser>
+['#cam', '#carrete'].forEach((s) => $(s).addEventListener('change', (e) => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (files.length) recibir(files);
+}));
 
-const LADO_MAXIMO = 1600;
-const CALIDAD = 0.7;
-const kb = (n) => Math.round(n / 1024) + ' KB';
-const lineas = [];
-
-function reducir(file) {
-  return createImageBitmap(file).then((bitmap) => {
-    const escala = Math.min(1, LADO_MAXIMO / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * escala);
-    canvas.height = Math.round(bitmap.height * escala);
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return new Promise((resolve, reject) => canvas.toBlob(
-      (blob) => blob ? resolve({ blob, width: bitmap.width, height: bitmap.height }) : reject(new Error('toBlob vacío')),
-      'image/jpeg', CALIDAD));
+// ---------- render ----------
+let tToast;
+function render() {
+  let html = S.instDia ? V().render() : pantallaInst();
+  if (S.modal) html += `<div class="modal"><div class="caja">${MODAL[S.modal.tipo]()}</div></div>`;
+  if (S.toast) html += `<div class="toast">${esc(S.toast)}</div>`;
+  $('#app').innerHTML = html;
+  if (S.toast) { clearTimeout(tToast); tToast = setTimeout(() => { S.toast = ''; $('.toast')?.remove(); }, 2500); }
+  renderBarra();
+}
+function renderBarra() {
+  $('#vlabel').textContent = `${S.v} · ${VAR[S.v]}`;
+  $('#bSenal').textContent = S.senal ? 'señal ✓' : 'sin señal ✗';
+  $('#bSim').textContent = S.simuladas ? 'fotos simuladas' : 'cámara real';
+  $('#bToq').textContent = `toques: ${S.toques} ↺`;
+  renderEstado();
+}
+function renderEstado() {
+  const el = $('#estado'); if (el.hidden) return;
+  const resumen = {
+    variante: S.v, institucionDelDia: S.instDia, senal: S.senal, fotosSimuladas: S.simuladas, toques: S.toques,
+    bandejaSinPaciente: S.bandeja.length, sinSubir: sinSubir().map((f) => `${f.id}:${f.estado}`),
+    vista: S.v === 'A' ? S.A : S.v === 'B' ? S.B : S.C, modal: S.modal?.tipo ?? null,
+    pacientes: S.pacientes.map((p) => `${p.id} ${p.apellido}, ${p.nombre}${p.nota ? ` (${p.nota})` : ''}${p.archivado ? ' [archivado]' : ''} · actual: ${instActual(p) ?? '-'} · Fotos: ${p.fotos.length}, hoy: ${fotosHoy(p).length}`),
+  };
+  el.innerHTML = '<button data-a="nuevoDia">Nuevo día (olvidar Institución y ronda)</button>\n' + esc(JSON.stringify(resumen, null, 2));
+}
+// el ticker no re-renderiza todo: sólo actualiza estados, para no cortar lo que ella esté escribiendo
+function refrescarEstados() {
+  document.querySelectorAll('.th[data-id]').forEach((el) => {
+    const f = buscarFoto(el.dataset.id); if (!f) return;
+    el.classList.remove('pendiente', 'subiendo', 'subida', 'espera'); el.classList.add(f.estado);
+    el.querySelector('.est').textContent = ESTADO[f.estado];
   });
+  document.querySelectorAll('.indicador').forEach((el) => { el.innerHTML = indicadorHTML(); });
+  renderEstado();
 }
 
-async function procesar(file, variante, n) {
-  const exif = readExif(new Uint8Array(await file.arrayBuffer()));
-  const datos = {
-    'Variante': variante,
-    'Archivo': n + ' de la tanda',
-    'Tipo': file.type || '(vacío)',
-    'Peso': kb(file.size),
-    'lastModified': new Date(file.lastModified).toISOString(),
-    'EXIF': exif.exif ? 'sí' : 'no',
-    'DateTimeOriginal': exif.dateTimeOriginal || '(no)',
-    'OffsetTimeOriginal': exif.offsetTimeOriginal || '(no)',
-    'Ubicación en el archivo': exif.gps ? 'sí' : 'no',
-  };
-  if (exif.error) datos['Error EXIF'] = exif.error;
-  let url = null;
-  try {
-    const inicio = performance.now();
-    const r = await reducir(file);
-    datos['Tamaño original'] = r.width + 'x' + r.height;
-    datos['Peso reducido'] = kb(r.blob.size);
-    datos['Tiempo de reducción'] = Math.round(performance.now() - inicio) + ' ms';
-    const salida = readExif(new Uint8Array(await r.blob.arrayBuffer()));
-    datos['Ubicación tras reducir'] = salida.gps ? 'sí' : 'no';
-    url = URL.createObjectURL(r.blob);
-  } catch (e) {
-    datos['Error al reducir'] = String(e);
-  }
-  const caja = document.createElement('div');
-  caja.className = 'foto';
-  const dl = document.createElement('dl');
-  for (const [k, v] of Object.entries(datos)) {
-    const dt = document.createElement('dt'); dt.textContent = k + ':';
-    const dd = document.createElement('dd'); dd.textContent = v;
-    dl.append(dt, dd);
-  }
-  caja.append(dl);
-  if (url) {
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = 'Foto reducida';
-    caja.append(img);
-  }
-  document.getElementById('resultados').prepend(caja);
-  lineas.push(Object.entries(datos).map(([k, v]) => k + ': ' + v).join(' | '));
-  document.getElementById('reporte').value = lineas.join('\n');
-}
+// subida simulada: una Foto por vez, 1,5 s cada una, sólo con señal
+setInterval(() => {
+  if (!S.senal) return;
+  const fs = todas();
+  const sub = fs.find((f) => f.estado === 'subiendo');
+  if (sub) { if (Date.now() - sub.t0 > 1500) { sub.estado = 'subida'; refrescarEstados(); } return; }
+  const p = fs.find((f) => f.estado === 'pendiente');
+  if (p) { p.estado = 'subiendo'; p.t0 = Date.now(); refrescarEstados(); }
+}, 300);
 
-if (typeof document !== 'undefined') {
-  const instalada = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  document.getElementById('modo').textContent = 'Modo: ' + (instalada ? 'web app de inicio' : 'Safari');
-  lineas.push('Modo: ' + (instalada ? 'web app de inicio' : 'Safari') + ' | ' + navigator.userAgent);
-  for (const id of ['a', 'b', 'c', 'd']) {
-    document.getElementById(id).addEventListener('change', async (ev) => {
-      const files = [...ev.target.files];
-      for (let i = 0; i < files.length; i++) await procesar(files[i], id.toUpperCase(), i + 1);
-      ev.target.value = '';
-    });
-  }
-}
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-a]'); if (!el) return;
+  if (!el.closest('#barra, #estado')) S.toques++;
+  const r = ACC[el.dataset.a](el.dataset, e, el);
+  if (r === false) renderBarra(); else render();
+});
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'q') return;
+  S.q = e.target.value; $('#res').innerHTML = V().res();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest('input, textarea, [contenteditable]')) return;
+  if (e.key === 'ArrowLeft') { irVariante(-1); render(); }
+  if (e.key === 'ArrowRight') { irVariante(1); render(); }
+});
+render();
 </script>
 </body>
 </html>
